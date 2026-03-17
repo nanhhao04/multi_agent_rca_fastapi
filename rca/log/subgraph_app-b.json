@@ -1,0 +1,13 @@
+{
+  "target": "app-b",
+  "nodes": [
+    "app-a",
+    "app-b"
+  ],
+  "edges": [
+    [
+      "app-a",
+      "app-b"
+    ]
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "pipeline": "GALA-TWIST-trace-RCA",
+  "weights": {
+    "w1": 0.3,
+    "w2": 0.25,
+    "w3": 0.25,
+    "w4": 0.2
+  },
+  "ranking": [
+    {
+      "rank": 1,
+      "service": "app-a",
+      "score": 0.726453,
+      "c1_self_anomaly": 0.1639,
+      "c2_trace_impact": 1.0,
+      "c3_blast_radius": 0.9091,
+      "c4_delay_severity": 1.0,
+      "avg_duration_ms": 169.95,
+      "total_spans": 61,
+      "anomalous_spans": 10,
+      "error_traces": 1
+    },
+    {
+      "rank": 2,
+      "service": "app-b",
+      "score": 0.152128,
+      "c1_self_anomaly": 0.0,
+      "c2_trace_impact": 0.0,
+      "c3_blast_radius": 0.0,
+      "c4_delay_severity": 0.7606,
+      "avg_duration_ms": 334.15,
+      "total_spans": 30,
+      "anomalous_spans": 0,
+      "error_traces": 0
+    },
+    {
+      "rank": 3,
+      "service": "app-c",
+      "score": 0.010197,
+      "c1_self_anomaly": 0.0333,
+      "c2_trace_impact": 0.0,
+      "c3_blast_radius": 0.0,
+      "c4_delay_severity": 0.001,
+      "avg_duration_ms": 0.38,
+      "total_spans": 30,
+      "anomalous_spans": 1,
+      "error_traces": 0
+    }
+  ]
+}

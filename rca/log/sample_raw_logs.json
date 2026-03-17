@@ -1,0 +1,1 @@
+[{"stream": {"compose_service": "app-a"}, "values": [["1773764902425858048", "INFO: Normal operation"], ["1773764842426246912", "ERROR: Connection failed to database"], ["1773764782426253056", "EXCEPTION: NullPointerException in UserController"], ["1773764722426255872", "ERROR: Connection failed to database"]]}]

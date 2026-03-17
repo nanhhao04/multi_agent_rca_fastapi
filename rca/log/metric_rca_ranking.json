@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-03-17T14:37:44.879510+00:00",
+  "pipeline": "GALA-metric-RCA",
+  "ranking": [
+    {
+      "rank": 1,
+      "service": "app-a",
+      "score": 0.69608,
+      "pagerank_norm": 1.0,
+      "rw_norm": 1.0,
+      "severity": 0.2402,
+      "is_anomalous": false,
+      "max_z_score": 1.4411,
+      "anomaly_metrics": [],
+      "causal_influence": 2,
+      "out_degree": 2,
+      "in_degree": 0
+    },
+    {
+      "rank": 2,
+      "service": "app-c",
+      "score": 0.396273,
+      "pagerank_norm": 0.5218,
+      "rw_norm": 0.4946,
+      "severity": 0.2284,
+      "is_anomalous": false,
+      "max_z_score": 1.3703,
+      "anomaly_metrics": [],
+      "causal_influence": 0,
+      "out_degree": 1,
+      "in_degree": 1
+    },
+    {
+      "rank": 3,
+      "service": "app-b",
+      "score": 0.314312,
+      "pagerank_norm": 0.3783,
+      "rw_norm": 0.3474,
+      "severity": 0.2415,
+      "is_anomalous": false,
+      "max_z_score": 1.4491,
+      "anomaly_metrics": [],
+      "causal_influence": -2,
+      "out_degree": 0,
+      "in_degree": 2
+    }
+  ],
+  "anomalies": {
+    "app-a": {
+      "is_anomalous": false,
+      "max_z_score": 1.4411,
+      "anomaly_metrics": [],
+      "z_scores": {
+        "request_rate": 1.4159,
+        "error_rate": 1.2649,
+        "latency": 1.4411
+      },
+      "severity": 0.2402
+    },
+    "app-b": {
+      "is_anomalous": false,
+      "max_z_score": 1.4491,
+      "anomaly_metrics": [],
+      "z_scores": {
+        "request_rate": 1.3703,
+        "latency": 1.4491
+      },
+      "severity": 0.2415
+    },
+    "app-c": {
+      "is_anomalous": false,
+      "max_z_score": 1.3703,
+      "anomaly_metrics": [],
+      "z_scores": {
+        "request_rate": 1.3703,
+        "latency": 0.7867
+      },
+      "severity": 0.2284
+    }
+  },
+  "graph": {
+    "nodes": [
+      "app-a",
+      "app-b",
+      "app-c"
+    ],
+    "edges": [
+      [
+        "app-a",
+        "app-b",
+        {
+          "weight": 0.8246,
+          "best_corr": 0.8589,
+          "best_lag": 4,
+          "best_metric": "request_rate"
+        }
+      ],
+      [
+        "app-a",
+        "app-c",
+        {
+          "weight": 0.7415,
+          "best_corr": 0.8589,
+          "best_lag": 4,
+          "best_metric": "request_rate"
+        }
+      ],
+      [
+        "app-c",
+        "app-b",
+        {
+          "weight": 0.6641,
+          "best_corr": 0.6805,
+          "best_lag": 4,
+          "best_metric": "request_rate"
+        }
+      ]
+    ],
+    "is_dag": true
+  }
+}

@@ -1,12 +1,16 @@
 TIMES=10
-for i in $(eval echo "{1..$TIMES}")
+
+for ((i=1;i<=TIMES;i++))
 do
-    siege -c 1 -r 10 http://localhost:8000/
-    siege -c 3 -r 5 http://localhost:8000/io_task
-    siege -c 2 -r 5 http://localhost:8000/cpu_task
-    siege -c 5 -r 3 http://localhost:8000/random_sleep
-    siege -c 2 -r 10 http://localhost:8000/random_status
-    siege -c 2 -r 3 http://localhost:8000/chain
-    siege -c 1 -r 1 http://localhost:8000/error_test
+    echo "Round $i"
+
+    for j in {1..10}; do curl http://localhost:8000/; done
+    for j in {1..10}; do curl http://localhost:8000/io_task; done
+    for j in {1..10}; do curl http://localhost:8000/cpu_task; done
+    for j in {1..10}; do curl http://localhost:8000/random_sleep; done
+    for j in {1..10}; do curl http://localhost:8000/random_status; done
+    for j in {1..10}; do curl http://localhost:8000/chain; done
+    curl http://localhost:8000/error_test
+
     sleep 5
 done
