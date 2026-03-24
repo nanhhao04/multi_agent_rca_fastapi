@@ -1,2 +1,2 @@
 # Luồng hoạt động
-images/rca_arc.png
+![RCA](images/rca_arc.png)

@@ -2,11 +2,12 @@ import logging
 import os
 import random
 import time
+import asyncio
 from typing import Optional
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request, BackgroundTasks
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
     OTLPSpanExporter as OTLPSpanExporterGRPC,
@@ -19,6 +20,7 @@ from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.propagate import inject
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 EXPOSE_PORT = os.environ.get("EXPOSE_PORT", 8000)
@@ -33,8 +35,52 @@ OTLP_HTTP_ENDPOINT = os.environ.get(
 
 TARGET_ONE_HOST = os.environ.get("TARGET_ONE_HOST", "app-b")
 TARGET_TWO_HOST = os.environ.get("TARGET_TWO_HOST", "app-c")
+SERVICE_NAME = os.environ.get("OTEL_SERVICE_NAME", "unknown")
 
 app = FastAPI()
+
+
+def inject_fault(service_name: str):
+    # Differentiate error rates by service to create varied data for RCA
+    rate = 0.3
+    if service_name == "app-a":
+        rate = 0.3
+    elif service_name == "app-b":
+        rate = 0.3
+    elif service_name == "app-c":
+        rate = 0.3
+
+    if random.random() < rate:
+        fault_type = random.choice(["latency", "exception", "resource"])
+        if fault_type == "latency":
+            delay = random.uniform(2, 7)
+            logging.warning(f"[{service_name}] Fault Injection: Delaying {delay:.2f}s")
+            time.sleep(delay)
+        elif fault_type == "exception":
+            logging.error(f"[{service_name}] Fault Injection: Raising random RuntimeError")
+            raise RuntimeError(f"Simulated internal error in {service_name}")
+        elif fault_type == "resource":
+            logging.critical(f"[{service_name}] Fault Injection: Simulated high CPU/Memory usage")
+            # Simulate high iterations
+            _ = [i * i for i in range(1_000_000)]
+
+
+@app.middleware("http")
+async def fault_injection_middleware(request: Request, call_next):
+    # Skip fault injection for metadata/root paths to keep the app "alive" for health checks
+    if request.url.path not in ["/", "/docs", "/openapi.json"]:
+        inject_fault(SERVICE_NAME)
+    response = await call_next(request)
+    return response
+
+
+async def log_background_anomaly(service_name: str):
+    """Simulate a background process reporting an issue."""
+    await asyncio.sleep(random.uniform(1, 4))
+    levels = [logging.ERROR, logging.CRITICAL, logging.WARNING]
+    level = random.choice(levels)
+    msg = f"[{service_name}] Background check failed: {random.choice(['Disk I/O jitter', 'Network latency spikes', 'DB connection pool near limit'])}"
+    logging.log(level, msg)
 
 
 def setting_jaeger(app: ASGIApp, log_correlation: bool = True) -> None:
@@ -82,7 +128,7 @@ async def read_item(item_id: int, q: Optional[str] = None):
     logging.error("items")
     return {"item_id": item_id, "q": q}
 
-
+'''
 @app.get("/io_task")
 async def io_task():
     time.sleep(1)
@@ -96,7 +142,31 @@ async def cpu_task():
         _ = i * i * i
     logging.error("cpu task")
     return "CPU bound task finish!"
+'''
 
+@app.get("/io_task")
+async def io_task(background_tasks: BackgroundTasks):
+    # Thêm: random latency spike thỉnh thoảng
+    delay = random.choices([1, 3, 8, 15], weights=[30, 20, 30, 20])[0]
+    if delay > 5:
+        logging.critical(f"Extremely high delay detected: {delay}s")
+    background_tasks.add_task(log_background_anomaly, SERVICE_NAME)
+    time.sleep(delay)
+    logging.error(f"io task - delay={delay}s")
+    return "IO bound task finish!"
+
+
+@app.get("/cpu_task")
+async def cpu_task(background_tasks: BackgroundTasks):
+    # Thêm: tăng workload thỉnh thoảng
+    n = random.choices([1_000, 100_000, 1_000_000, 5_000_000], weights=[50, 20, 20, 10])[0]
+    if n > 1_000_000:
+        logging.critical(f"Heavy CPU workload: {n} iterations")
+    background_tasks.add_task(log_background_anomaly, SERVICE_NAME)
+    for i in range(n):
+        _ = i * i * i
+    logging.error(f"cpu task - iterations={n}")
+    return "CPU bound task finish!"
 
 @app.get("/random_status")
 async def random_status(response: Response):
@@ -114,15 +184,24 @@ async def random_sleep(response: Response):
 
 @app.get("/error_test")
 async def error_test(response: Response):
-    logging.error("got error!!!!")
-    raise ValueError("value error")
+    error_type = random.choice(["Value", "Key", "Attribute", "ZeroDivision"])
+    logging.error(f"Triggering {error_type} error test")
+    if error_type == "Value":
+        raise ValueError("Simulated Value Error")
+    elif error_type == "Key":
+        _ = {}["missing_key"]
+    elif error_type == "Attribute":
+        _ = None.attribute
+    else:
+        _ = 1 / 0
 
 
 @app.get("/chain")
-async def chain(response: Response):
+async def chain(response: Response, background_tasks: BackgroundTasks):
     headers = {}
     inject(headers)  # inject trace info to header
-    logging.critical(headers)
+    logging.critical(f"Chain started on {SERVICE_NAME} with headers: {headers}")
+    background_tasks.add_task(log_background_anomaly, SERVICE_NAME)
 
     async with httpx.AsyncClient() as client:
         await client.get(

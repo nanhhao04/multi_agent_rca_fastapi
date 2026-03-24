@@ -1,4 +1,6 @@
 import operator
+import json
+import os
 from typing import TypedDict, List, Dict, Any, Annotated
 from langgraph.graph import StateGraph, END
 
@@ -46,12 +48,32 @@ def build_graph():
     graph.add_edge("remediation", END)
     return graph.compile()
 
-if __name__ == "__main__":
-    app = build_graph()
-    init_state = {
-        "initial_ranking_metrics": ["app-a"],
-        "initial_ranking_traces": [],
-        "current_ranking": ["app-a"],
+def load_initial_state(metric_path: str, trace_path: str) -> Dict[str, Any]:
+    """Load initial state from ranking files."""
+    initial_metrics = []
+    if os.path.exists(metric_path):
+        with open(metric_path, 'r') as f:
+            data = json.load(f)
+            initial_metrics = [item["service"] for item in data.get("ranking", [])]
+    
+    initial_traces = []
+    if os.path.exists(trace_path):
+        with open(trace_path, 'r') as f:
+            data = json.load(f)
+            initial_traces = [item["service"] for item in data.get("ranking", [])]
+            
+    # Combine rankings for initial exploration, preserving order and uniqueness
+    seen = set()
+    current_ranking = []
+    for s in initial_metrics + initial_traces:
+        if s not in seen:
+            current_ranking.append(s)
+            seen.add(s)
+            
+    return {
+        "initial_ranking_metrics": initial_metrics,
+        "initial_ranking_traces": initial_traces,
+        "current_ranking": current_ranking,
         "seen_candidates": [],
         "iteration_count": 0,
         "current_pod": "",
@@ -61,5 +83,21 @@ if __name__ == "__main__":
         "next_candidate": "",
         "final_report": ""
     }
+
+if __name__ == "__main__":
+    app = build_graph()
+    
+    # Paths to phase 1 and phase 2 outputs
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    metric_ranking_file = os.path.join(base_dir, "log", "metric_rca_ranking.json")
+    trace_ranking_file = os.path.join(base_dir, "log", "trace_rca_ranking.json")
+
+    init_state = load_initial_state(metric_ranking_file, trace_ranking_file)
+    
+    print(f"Loaded initial ranking metrics: {init_state['initial_ranking_metrics']}")
+    print(f"Loaded initial ranking traces: {init_state['initial_ranking_traces']}")
+    print(f"Merged exploration ranking: {init_state['current_ranking']}")
+
     result = app.invoke(init_state)
+    print("\n--- FINAL REPORT ---")
     print(result.get("final_report"))

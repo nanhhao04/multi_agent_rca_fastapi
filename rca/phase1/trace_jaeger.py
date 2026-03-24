@@ -20,7 +20,7 @@ import networkx as nx
 JAEGER_URL = "http://localhost:16686"
 SERVICE_NAME = "app-a"
 LOOKBACK = "1h"
-LIMIT = 20
+LIMIT = 200
 LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "log")
 
 # TWIST weights
@@ -42,7 +42,7 @@ def fetch_traces(service=SERVICE_NAME, lookback=LOOKBACK, limit=LIMIT):
     os.makedirs(LOG_DIR, exist_ok=True)
     with open(os.path.join(LOG_DIR, "traces.json"), "w", encoding="utf-8") as f:
         json.dump({"data": traces}, f, ensure_ascii=False, indent=2)
-    print(f"📡 Fetched {len(traces)} traces from Jaeger (service={service})")
+    print(f"Fetched {len(traces)} traces from Jaeger (service={service})")
     return traces
 
 
@@ -82,7 +82,6 @@ def build_trace_dag(trace):
     return G, span_map
 
 
-# ── 3. TWIST SCORING ────────────────────────
 def twist_score(traces):
     """
     Compute TWIST scores for each service across all traces.
@@ -184,22 +183,18 @@ def twist_score(traces):
     results.sort(key=lambda x: x[1]["score"], reverse=True)
     return results
 
-
-# ── 4. PIPELINE ─────────────────────────────
 def run_pipeline(service=SERVICE_NAME, lookback=LOOKBACK, limit=LIMIT):
-    print("\n" + "█" * 50)
-    print("  GALA TWIST — TRACE RCA PIPELINE")
-    print("█" * 50)
+
 
     traces = fetch_traces(service, lookback, limit)
     if not traces:
-        print("❌ No traces found!")
+        print(" No traces found!")
         return {"error": "No traces"}
 
     ranking = twist_score(traces)
 
     # Print ranking
-    print(f"\n🏆 TWIST Ranking (w={W1},{W2},{W3},{W4}):")
+    print(f"\n TWIST Ranking (w={W1},{W2},{W3},{W4}):")
     print(f"  {'#':<3} {'Service':<20} {'Score':<8} {'c1(self)':<10} {'c2(impact)':<10} {'c3(blast)':<10} {'c4(delay)':<10}")
     print(f"  {'─'*3} {'─'*20} {'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*10}")
     for i, (svc, v) in enumerate(ranking, 1):
@@ -219,7 +214,7 @@ def run_pipeline(service=SERVICE_NAME, lookback=LOOKBACK, limit=LIMIT):
     print(f"\n Done → {path}")
     if ranking:
         rc, info = ranking[0]
-        print(f"🔥 Root cause: {rc} (score={info['score']:.4f})")
+        print(f" Root cause: {rc} (score={info['score']:.4f})")
     return {"ranking": ranking}
 
 

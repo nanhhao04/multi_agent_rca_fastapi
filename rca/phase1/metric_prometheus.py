@@ -35,7 +35,7 @@ METRIC_QUERIES = {
 }
 
 
-# ── 1. PROMETHEUS FETCHER ────────────────────
+# 1. PROMETHEUS FETCHER
 def _query_prom(query, minutes_back=15, step="15s"):
     now = datetime.now(timezone.utc)
     start = now - timedelta(minutes=minutes_back)
@@ -46,63 +46,93 @@ def _query_prom(query, minutes_back=15, step="15s"):
         }, timeout=10)
         r.raise_for_status()
         data = r.json()
+
+
         return data["data"]["result"] if data.get("status") == "success" else None
+
     except Exception as e:
-        print(f"❌ Prometheus error: {e}")
+        print(f"Prometheus error: {e}")
         return None
 
 
-def _to_dataframe(results):
+def _to_dataframe(results, metric_name=""):  # ← thêm metric_name=""
     if not results:
         return pd.DataFrame()
     series_dict, ref_len = {}, None
     for item in results:
         svc = item["metric"].get("service_name") or item["metric"].get("job") or "unknown"
-        vals = [float(v[1]) if v[1] != "NaN" else 0.0 for v in item.get("values", [])]
+
+        # Xử lý NaN theo từng loại metric
+        if metric_name == "latency":
+            vals = [float(v[1]) if v[1] != "NaN" else np.nan for v in item.get("values", [])]
+        else:
+            vals = [float(v[1]) if v[1] != "NaN" else 0.0 for v in item.get("values", [])]
+
         if not vals:
             continue
         if ref_len is None:
             ref_len = len(vals)
-        # align length
         vals = (vals + [vals[-1]] * max(0, ref_len - len(vals)))[:ref_len]
-        series_dict[svc] = [a + b for a, b in zip(series_dict.get(svc, [0]*ref_len), vals)]
+        series_dict[svc] = [a + b for a, b in zip(series_dict.get(svc, [0] * ref_len), vals)]
+
     if not series_dict:
         return pd.DataFrame()
-    return pd.DataFrame(series_dict).ffill().fillna(0).replace([np.inf, -np.inf], 0)
+
+    df = pd.DataFrame(series_dict)
+    if metric_name == "latency":
+        df = df.ffill().bfill().fillna(0)
+    else:
+        df = df.ffill().fillna(0)
+
+    return df.replace([np.inf, -np.inf], 0)
 
 
 def fetch_metrics(minutes_back=15, step="15s"):
     """Fetch request_rate, error_rate, latency from Prometheus → dict of DataFrames."""
-    print(f"\n📡 Fetching metrics from Prometheus ({minutes_back}min, step={step})")
+    print(f"\n Fetching metrics from Prometheus ({minutes_back}min, step={step})")
     metrics = {}
+    raw_all = {}
+
     for name, query in METRIC_QUERIES.items():
         results = _query_prom(query, minutes_back, step)
-        df = _to_dataframe(results) if results else pd.DataFrame()
+        raw_all[name] = results or []
+
+        df = _to_dataframe(results, metric_name=name) if results else pd.DataFrame()
         if not df.empty:
             metrics[name] = df
-            print(f"  ✅ {name}: {df.shape[1]} services, {df.shape[0]} steps")
+            print(f"  {name}: {df.shape[1]} services, {df.shape[0]} steps")
         else:
-            print(f"  ⚠  {name}: no data")
-    if not metrics:
-        print("❌ No metrics available!")
-        return None
-    # save CSV
+            print(f"  {name}: no data")
+
     os.makedirs(LOG_DIR, exist_ok=True)
-    if "request_rate" in metrics:
-        metrics["request_rate"].to_csv(os.path.join(LOG_DIR, "metric_prometheus.csv"), index=False)
-    return metrics
+
+    # Lưu JSON
+    with open(os.path.join(LOG_DIR, "metric_prometheus.json"), "w", encoding="utf-8") as f:
+        json.dump({
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "params": {"minutes_back": minutes_back, "step": step},
+            "metrics": raw_all
+        }, f, indent=2, default=str)
+
+    # Lưu CSV riêng từng metric
+    for name, df in metrics.items():
+        csv_path = os.path.join(LOG_DIR, f"metric_{name}.csv")
+        df.to_csv(csv_path, index=False)
+        print(f"  Saved {name} → {csv_path}")
+
+    return metrics if metrics else None
 
 
-# ── 2. Z-SCORE ANOMALY DETECTION ────────────
 def detect_anomalies(metrics, z_threshold=Z_THRESHOLD, window=ROLLING_WINDOW):
     """Z-score anomaly detection per service per metric."""
     all_svcs = sorted(set(c for df in metrics.values() for c in df.columns))
+    #  ["app-a", "app-b", "app-c"]
     results = {}
     for svc in all_svcs:
         z_scores, anom_list = {}, []
         for mname, df in metrics.items():
-            if svc not in df.columns:
-                continue
+            # mname = "request_rate" / "error_rate" / "latency"
+
             s = df[svc].values
             if len(s) < window + 1:
                 mu, sigma = np.mean(s), np.std(s)
@@ -121,26 +151,30 @@ def detect_anomalies(metrics, z_threshold=Z_THRESHOLD, window=ROLLING_WINDOW):
             "z_scores": z_scores,
             "severity": round(min(1.0, max_z / (z_threshold * 3)), 4),
         }
+        print("-----------")
+        print(results[svc])
     # summary
     anom = [s for s, v in results.items() if v["is_anomalous"]]
-    print(f"\n🔬 Anomaly detection: {len(anom)}/{len(results)} anomalous (threshold={z_threshold})")
+    print(f"\nAnomaly detection: {len(anom)}/{len(results)} anomalous (threshold={z_threshold})")
     for s in all_svcs:
         v = results[s]
-        flag = "🔴" if v["is_anomalous"] else "🟢"
-        print(f"  {flag} {s:<20} z={v['max_z_score']:.2f}  severity={v['severity']:.2f}")
+
+        print(f"  {s:<20} z={v['max_z_score']:.2f}  severity={v['severity']:.2f}")
     return results
 
 
-# ── 3. CAUSAL GRAPH (CROSS-CORRELATION) ─────
+# ── 3. CAUSAL GRAPH (CROSS-CORRELATION)
 def _lagged_corr(x, y, max_lag=MAX_LAG):
     """Best lagged Pearson correlation corr(x(t), y(t+lag)). Returns (lag, corr, pval)."""
     n = len(x)
-    best = (0, 0.0, 1.0)
+    best = (0, 0.0, 1.0)  #lag correlation p-value
     for lag in range(1, min(max_lag + 1, n - 2)):
         xs, ys = x[:n-lag], y[lag:]
         if np.std(xs) < 1e-9 or np.std(ys) < 1e-9:
             continue
         c, p = sp_stats.pearsonr(xs, ys)
+        # c = correlation: -1 (nghịch) → 0 (không liên quan) → 1 (thuận)
+        # p = p-value: < 0.05 → có ý nghĩa thống kê
         if abs(c) > abs(best[1]):
             best = (lag, c, p)
     return best
@@ -186,13 +220,12 @@ def build_causal_graph(metrics, max_lag=MAX_LAG, corr_thr=CORR_THRESHOLD, sig=SI
         weakest = min(cycle, key=lambda e: G[e[0]][e[1]].get("weight", 0))
         G.remove_edge(weakest[0], weakest[1])
 
-    print(f"\n🔗 Causal graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, DAG={nx.is_directed_acyclic_graph(G)}")
+    print(f"\n Causal graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, DAG={nx.is_directed_acyclic_graph(G)}")
     for u, v, d in G.edges(data=True):
         print(f"  {u} → {v}  corr={d.get('best_corr', 0):.3f} lag={d.get('best_lag', 0)}")
     return G
 
 
-# ── 4. PERSONALIZED PAGERANK RANKING ────────
 def rank_root_causes(G, anomaly_info, alpha=PAGERANK_ALPHA, anom_w=ANOMALY_WEIGHT):
     """Personalized PageRank on reversed DAG + anomaly severity → ranked list."""
     if G.number_of_nodes() == 0:
@@ -236,23 +269,19 @@ def rank_root_causes(G, anomaly_info, alpha=PAGERANK_ALPHA, anom_w=ANOMALY_WEIGH
         }))
     ranking.sort(key=lambda x: x[1]["score"], reverse=True)
 
-    print(f"\n🏆 Root Cause Ranking:")
+    print(f"\n Root Cause Ranking:")
     for i, (n, v) in enumerate(ranking, 1):
-        flag = "🔴" if v["is_anomalous"] else "🟢"
-        rc = " ◀ ROOT CAUSE" if i == 1 else ""
-        print(f"  {i}. {flag} {n:<20} score={v['score']:.4f} pr={v['pagerank_norm']:.3f} z={v['max_z_score']:.2f}{rc}")
+
+        rc = "  ROOT CAUSE" if i == 1 else ""
+        print(f"  {i}.  {n:<20} score={v['score']:.4f} pr={v['pagerank_norm']:.3f} z={v['max_z_score']:.2f}{rc}")
     return ranking
 
 
-# ── 5. PIPELINE ─────────────────────────────
 def run_pipeline(minutes_back=15, step="15s"):
-    print("\n" + "█" * 50)
-    print("  GALA METRIC RCA PIPELINE")
-    print("█" * 50)
 
     metrics = fetch_metrics(minutes_back, step)
     if not metrics:
-        print(f"\n💡 Check Prometheus at {PROM}, ensure 'calls_total' metric exists.")
+        print(f"\n Check Prometheus at {PROM}, ensure 'calls_total' metric exists.")
         return {"error": "No metrics"}
 
     anomalies = detect_anomalies(metrics)
@@ -263,7 +292,6 @@ def run_pipeline(minutes_back=15, step="15s"):
     os.makedirs(LOG_DIR, exist_ok=True)
     out = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "pipeline": "GALA-metric-RCA",
         "ranking": [{"rank": i+1, "service": n, **v} for i, (n, v) in enumerate(ranking)],
         "anomalies": anomalies,
         "graph": {
@@ -276,12 +304,12 @@ def run_pipeline(minutes_back=15, step="15s"):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2, default=str)
 
-    print(f"\n✅ Done → {path}")
+    print(f"\n Done → {path}")
     if ranking:
         rc, info = ranking[0]
-        print(f"🔥 Root cause: {rc} (score={info['score']:.4f}, z={info['max_z_score']:.2f})")
+        print(f" Root cause: {rc} (score={info['score']:.4f}, z={info['max_z_score']:.2f})")
     return {"metrics": metrics, "anomalies": anomalies, "graph": graph, "ranking": ranking}
 
 
 if __name__ == "__main__":
-    run_pipeline(minutes_back=15, step="15s")
+    run_pipeline(minutes_back=15, step="30s")

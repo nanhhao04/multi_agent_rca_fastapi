@@ -1,16 +1,16 @@
 {
-  "timestamp": "2026-03-17T14:37:44.879510+00:00",
+  "timestamp": "2026-03-18T03:56:15.158056+00:00",
   "pipeline": "GALA-metric-RCA",
   "ranking": [
     {
       "rank": 1,
-      "service": "app-a",
-      "score": 0.69608,
+      "service": "app-b",
+      "score": 0.6962,
       "pagerank_norm": 1.0,
       "rw_norm": 1.0,
-      "severity": 0.2402,
+      "severity": 0.2405,
       "is_anomalous": false,
-      "max_z_score": 1.4411,
+      "max_z_score": 1.4427,
       "anomaly_metrics": [],
       "causal_influence": 2,
       "out_degree": 2,
@@ -18,13 +18,13 @@
     },
     {
       "rank": 2,
-      "service": "app-c",
-      "score": 0.396273,
-      "pagerank_norm": 0.5218,
-      "rw_norm": 0.4946,
-      "severity": 0.2284,
+      "service": "app-a",
+      "score": 0.407626,
+      "pagerank_norm": 0.5404,
+      "rw_norm": 0.5127,
+      "severity": 0.2293,
       "is_anomalous": false,
-      "max_z_score": 1.3703,
+      "max_z_score": 1.3756,
       "anomaly_metrics": [],
       "causal_influence": 0,
       "out_degree": 1,
@@ -32,13 +32,13 @@
     },
     {
       "rank": 3,
-      "service": "app-b",
-      "score": 0.314312,
-      "pagerank_norm": 0.3783,
-      "rw_norm": 0.3474,
-      "severity": 0.2415,
+      "service": "app-c",
+      "score": 0.314297,
+      "pagerank_norm": 0.3793,
+      "rw_norm": 0.3477,
+      "severity": 0.2405,
       "is_anomalous": false,
-      "max_z_score": 1.4491,
+      "max_z_score": 1.4427,
       "anomaly_metrics": [],
       "causal_influence": -2,
       "out_degree": 0,
@@ -48,34 +48,34 @@
   "anomalies": {
     "app-a": {
       "is_anomalous": false,
-      "max_z_score": 1.4411,
+      "max_z_score": 1.3756,
       "anomaly_metrics": [],
       "z_scores": {
-        "request_rate": 1.4159,
-        "error_rate": 1.2649,
-        "latency": 1.4411
+        "request_rate": 1.3756,
+        "error_rate": 1.3672,
+        "latency": 0.4743
       },
-      "severity": 0.2402
+      "severity": 0.2293
     },
     "app-b": {
       "is_anomalous": false,
-      "max_z_score": 1.4491,
+      "max_z_score": 1.4427,
       "anomaly_metrics": [],
       "z_scores": {
-        "request_rate": 1.3703,
-        "latency": 1.4491
+        "request_rate": 1.4427,
+        "latency": 0.4017
       },
-      "severity": 0.2415
+      "severity": 0.2405
     },
     "app-c": {
       "is_anomalous": false,
-      "max_z_score": 1.3703,
+      "max_z_score": 1.4427,
       "anomaly_metrics": [],
       "z_scores": {
-        "request_rate": 1.3703,
-        "latency": 0.7867
+        "request_rate": 1.4427,
+        "latency": 0.7659
       },
-      "severity": 0.2284
+      "severity": 0.2405
     }
   },
   "graph": {
@@ -87,32 +87,32 @@
     "edges": [
       [
         "app-a",
-        "app-b",
+        "app-c",
         {
-          "weight": 0.8246,
-          "best_corr": 0.8589,
-          "best_lag": 4,
-          "best_metric": "request_rate"
+          "weight": 0.8525,
+          "best_corr": 0.9374,
+          "best_lag": 1,
+          "best_metric": "latency"
         }
       ],
       [
+        "app-b",
+        "app-c",
+        {
+          "weight": 0.8542,
+          "best_corr": 0.9337,
+          "best_lag": 1,
+          "best_metric": "latency"
+        }
+      ],
+      [
+        "app-b",
         "app-a",
-        "app-c",
         {
-          "weight": 0.7415,
-          "best_corr": 0.8589,
-          "best_lag": 4,
-          "best_metric": "request_rate"
-        }
-      ],
-      [
-        "app-c",
-        "app-b",
-        {
-          "weight": 0.6641,
-          "best_corr": 0.6805,
-          "best_lag": 4,
-          "best_metric": "request_rate"
+          "weight": 0.8518,
+          "best_corr": 0.9261,
+          "best_lag": 1,
+          "best_metric": "latency"
         }
       ]
     ],

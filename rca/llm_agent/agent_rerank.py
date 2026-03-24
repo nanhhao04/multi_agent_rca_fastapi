@@ -33,6 +33,7 @@ def rerank_node(state):
 
     try:
         response = llm.invoke([HumanMessage(content=prompt)]).content.strip()
+        print(response)
         if "```json" in response:
             response = response.split("```json")[1].split("```")[0].strip()
         result = json.loads(response)

@@ -1,49 +1,42 @@
 {
-  "pipeline": "GALA-TWIST-trace-RCA",
-  "weights": {
-    "w1": 0.3,
-    "w2": 0.25,
-    "w3": 0.25,
-    "w4": 0.2
-  },
   "ranking": [
     {
       "rank": 1,
       "service": "app-a",
-      "score": 0.726453,
-      "c1_self_anomaly": 0.1639,
+      "score": 0.505105,
+      "c1_self_anomaly": 0.0383,
       "c2_trace_impact": 1.0,
-      "c3_blast_radius": 0.9091,
+      "c3_blast_radius": 0.1744,
       "c4_delay_severity": 1.0,
-      "avg_duration_ms": 169.95,
-      "total_spans": 61,
-      "anomalous_spans": 10,
-      "error_traces": 1
+      "avg_duration_ms": 241.91,
+      "total_spans": 600,
+      "anomalous_spans": 23,
+      "error_traces": 5
     },
     {
       "rank": 2,
       "service": "app-b",
-      "score": 0.152128,
+      "score": 0.02875,
       "c1_self_anomaly": 0.0,
       "c2_trace_impact": 0.0,
       "c3_blast_radius": 0.0,
-      "c4_delay_severity": 0.7606,
-      "avg_duration_ms": 334.15,
-      "total_spans": 30,
+      "c4_delay_severity": 0.1437,
+      "avg_duration_ms": 334.91,
+      "total_spans": 90,
       "anomalous_spans": 0,
       "error_traces": 0
     },
     {
       "rank": 3,
       "service": "app-c",
-      "score": 0.010197,
-      "c1_self_anomaly": 0.0333,
+      "score": 0.007548,
+      "c1_self_anomaly": 0.0222,
       "c2_trace_impact": 0.0,
       "c3_blast_radius": 0.0,
-      "c4_delay_severity": 0.001,
-      "avg_duration_ms": 0.38,
-      "total_spans": 30,
-      "anomalous_spans": 1,
+      "c4_delay_severity": 0.0044,
+      "avg_duration_ms": 0.88,
+      "total_spans": 90,
+      "anomalous_spans": 2,
       "error_traces": 0
     }
   ]
